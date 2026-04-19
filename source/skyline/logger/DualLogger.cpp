@@ -122,7 +122,7 @@ void setup_socket_hooks() {
 void DualLogger::Initialize() {}
 
 bool DualLogger::ShouldFlush() {
-    return g_tcpSocket != -1;
+    return true;
 }
 
 void DualLogger::SendRaw(void* data, size_t size) {

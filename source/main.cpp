@@ -41,15 +41,6 @@ Result handleNnFsMountRom(char const* path, void* buffer, unsigned long size) {
 
     skyline::utils::g_RomMountStr = std::string(path) + ":/";
 
-    // Some games such as Persona 5 Royal call this method multiple times, so we have to ensure we only initialize the queue once
-    /*g_MountRomInit.call_once([]() {
-        // start task queue
-        skyline::utils::SafeTaskQueue* taskQueue = new skyline::utils::SafeTaskQueue(100);
-        taskQueue->startThread(32, 3, 0x10000); // Stack size 0x4000 -> 0x10000
-        taskQueue->push(new std::unique_ptr<skyline::utils::Task>(after_romfs_task));
-        nn::os::WaitEvent(&after_romfs_task->completionEvent);
-    });*/
-
     return rc;
 }
 
