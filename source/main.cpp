@@ -6,6 +6,7 @@
 #include "skyline/utils/utils.h"
 #include "skyline/utils/call_once.hpp"
 #include "skyline/utils/cur_proc_handle.hpp"
+#include <nn/vi.h>
 
 // For handling exceptions
 char ALIGNA(0x1000) exception_handler_stack[0x4000];
@@ -36,19 +37,18 @@ static skyline::utils::Once g_MountRomInit;
 Result (*nnFsMountRomImpl)(char const*, void*, unsigned long);
 
 Result handleNnFsMountRom(char const* path, void* buffer, unsigned long size) {
-    Result rc = 0;
-    rc = nnFsMountRomImpl(path, buffer, size);
+    Result rc = nnFsMountRomImpl(path, buffer, size);
 
     skyline::utils::g_RomMountStr = std::string(path) + ":/";
 
     // Some games such as Persona 5 Royal call this method multiple times, so we have to ensure we only initialize the queue once
-    g_MountRomInit.call_once([]() {
+    /*g_MountRomInit.call_once([]() {
         // start task queue
         skyline::utils::SafeTaskQueue* taskQueue = new skyline::utils::SafeTaskQueue(100);
-        taskQueue->startThread(20, 3, 0x10000); // Stack size 0x4000 -> 0x10000
+        taskQueue->startThread(32, 3, 0x10000); // Stack size 0x4000 -> 0x10000
         taskQueue->push(new std::unique_ptr<skyline::utils::Task>(after_romfs_task));
         nn::os::WaitEvent(&after_romfs_task->completionEvent);
-    });
+    });*/
 
     return rc;
 }
@@ -88,6 +88,29 @@ Result nn_ro_init() {
     return ret;
 }
 
+Result (*orig_CreateLayer)(nn::vi::Layer**, nn::vi::Display*);
+static skyline::utils::Once g_CreateLayer;
+
+Result hooked_CreateLayer(nn::vi::Layer** out, nn::vi::Display* disp) {
+    Result res = orig_CreateLayer(out, disp);
+
+    g_CreateLayer.call_once([]() {
+        svcOutputDebugString("[skyline_main] initiating sockets\n", 34);
+        skyline::logger::skyline_socket_init();
+        skyline::logger::setup_socket_hooks();
+        skyline::logger::start_listen_thread();
+
+        if (!skyline::utils::g_RomMountStr.empty()) {
+            auto manager = new skyline::plugin::Manager();
+            manager->LoadPluginsImpl(); 
+        } else {
+            skyline::logger::s_Instance->Log("[skyline_main] ERROR: RomFS path is empty");
+        }
+    });
+
+    return res;
+}
+
 void skyline_main() {
     // populate our own process handle
     envSetOwnProcessHandle(skyline::proc_handle::Get());
@@ -95,31 +118,28 @@ void skyline_main() {
     // init hooking setup
     A64HookInit();
 
-    // Initialize sockets directly before hooks are installed, so the call
-    // reaches the nn::socket::Initialize before it is stubbed
-    skyline::logger::skyline_socket_init();
-
-    // Prevent the game from re-initializing or finalizing sockets
-    skyline::logger::setup_socket_hooks();
-
     // initialize logger
     nn::fs::MountSdCardForDebug("sd");
     skyline::logger::s_Instance = new skyline::logger::DualLogger();
     skyline::logger::s_Instance->StartThread();
     skyline::logger::s_Instance->Log("[skyline_main] Beginning initialization.\n");
 
-    // Start TCP accept on background thread (blocks until a client connects)
-    skyline::logger::start_listen_thread();
-
     // override exception handler to dump info
     nn::os::SetUserExceptionHandler(exception_handler, exception_handler_stack, sizeof(exception_handler_stack),
-                                    &exception_info);
+                                     &exception_info);
 
     // hook to prevent the game from double mounting romfs
     A64HookFunction(reinterpret_cast<void*>(nn::fs::MountRom), reinterpret_cast<void*>(handleNnFsMountRom),
                     (void**)&nnFsMountRomImpl);
 
     A64HookFunction(reinterpret_cast<void*>(nn::ro::Initialize), reinterpret_cast<void*>(nn_ro_init), (void**)&nnRoInitializeImpl);
+
+    A64HookFunction(
+        reinterpret_cast<void*>(nn::vi::CreateLayer),
+        reinterpret_cast<void*>(hooked_CreateLayer),
+        (void**)&orig_CreateLayer
+    );
+
 
     // hook abort to get crash info
     // Note: This was commented out because some games do not use or have certain variations of this symbol.

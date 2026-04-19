@@ -31,8 +31,8 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 
 # NOTE: TARGET and BUILD are now passed from parent Makefile
-TARGET		?=	$(notdir $(CURDIR))$(CROSSVER)
-BUILD		?=	build$(CROSSVER)
+TARGET		?=	$(notdir $(CURDIR))
+BUILD		?=	build
 SOURCES		:= 	source $(filter-out %.c %.cpp %.s,$(wildcard source/* source/*/* source/*/*/* source/*/*/*/*))
 DATA		:=	data
 INCLUDES	:=	include libs/libeiffel/include
@@ -45,7 +45,7 @@ ARCH	:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIC -ftls-model=local-exec
 CFLAGS	:=	-g -Wall -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -D__SWITCH__ -DCROSSVER=$(CROSSVER) 
+CFLAGS	+=	$(INCLUDE) -D__SWITCH__
 
 ifneq ($(strip $(NOLOG)),)
 CFLAGS	+=	  "-DNOLOG"
@@ -140,7 +140,7 @@ $(BUILD):
 	@echo "${CPPFILES}"
 	@echo "${CXXFLAGS}"
 	@[ -d $@ ] || mkdir -p $@
-	@cp $(LINKERSCRIPTS)/syms$(CROSSVER).ld $(LINKERSCRIPTS)/symstemp.ld # This is required because you can't pass a variable to the .specs
+	@cp $(LINKERSCRIPTS)/syms.ld $(LINKERSCRIPTS)/symstemp.ld # This is required because you can't pass a variable to the .specs
 	$(MAKE) -C $(BUILD) -f $(CURDIR)/$(MAKE_NSO)
 	@rm -f $(LINKERSCRIPTS)/symstemp.ld
 
