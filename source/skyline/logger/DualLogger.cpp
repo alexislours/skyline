@@ -68,16 +68,6 @@ void init_socket_thing(void*) {
 }
 
 void skyline_socket_init() {    
-    nn::nifm::Initialize();
-    nn::nifm::SubmitNetworkRequest();
-
-    while (nn::nifm::IsNetworkRequestOnHold()) { }
-
-    if (!nn::nifm::IsNetworkAvailable()) {
-        svcOutputDebugString("[Skyline] No network is available\n", 34);
-        return;
-    }
-
     nn::socket::Config config = {};
 
     const size_t poolSize = 0x600000;

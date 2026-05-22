@@ -86,7 +86,6 @@ Result hooked_CreateLayer(nn::vi::Layer** out, nn::vi::Display* disp) {
     Result res = orig_CreateLayer(out, disp);
 
     g_CreateLayer.call_once([]() {
-        svcOutputDebugString("[skyline_main] initiating sockets\n", 34);
         skyline::logger::skyline_socket_init();
         skyline::logger::setup_socket_hooks();
         skyline::logger::start_listen_thread();
