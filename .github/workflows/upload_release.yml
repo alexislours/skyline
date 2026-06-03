@@ -18,7 +18,7 @@ jobs:
     - name: make
       run: make
     - name: Prepare ZIP
-      run: mkdir exefs && cp skyline.nso exefs/subsdk9 && cp living_the_dream.npdm exefs/main.npdm && bsdtar -a -cf skyline.zip exefs
+      run: mkdir exefs && cp *.nso exefs/subsdk9 && cp living_the_dream.npdm exefs/main.npdm && bsdtar -a -cf skyline.zip exefs
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
