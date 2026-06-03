@@ -3,8 +3,6 @@
 
 .PHONY: all clean skyline send
 
-CROSSVER ?= 600
-
 PYTHON := python3
 ifeq (, $(shell which python3))
 	# if no python3 alias, fall back to `python` and hope it's py3
@@ -13,38 +11,28 @@ endif
 
 NAME 			:= $(shell basename $(CURDIR))
 NAME_LOWER		:= $(shell echo $(NAME) | tr A-Z a-z)
-PATCH_PREFIX	:= $(NAME_LOWER)_patch_
-PATCH 			:= $(PATCH_PREFIX)$(CROSSVER)
+TID				:= 010051F0207B2000
+CODE_NAME		:= living_the_dream
+SUBSDK_NAME		:= subsdk9
 
-PATCH_DIR 		:= patches
 SCRIPTS_DIR		:= scripts
-BUILD_DIR 		:= build$(CROSSVER)
+BUILD_DIR 		:= build
 
-CONFIGS 		:= $(PATCH_DIR)/configs
-CROSS_CONFIG 	:= $(CONFIGS)/$(CROSSVER).config
-
-MAPS 			:= $(PATCH_DIR)/maps
-CROSS_MAPS 		:= $(MAPS)/$(CROSSVER)
-NAME_MAP 		:= $(BUILD_DIR)/$(NAME)$(CROSSVER).map
-
-GEN_PATCH		:= $(SCRIPTS_DIR)/genPatch.py
 SEND_PATCH		:= $(SCRIPTS_DIR)/sendPatch.py
 
 MAKE_NSO		:= nso.mk
 
-all: skyline
+all: skyline $(CODE_NAME).npdm
 
 skyline:
-	$(MAKE) all -f $(MAKE_NSO) MAKE_NSO=$(MAKE_NSO) CROSSVER=$(CROSSVER) BUILD=$(BUILD_DIR) TARGET=$(NAME)$(CROSSVER)
-	#$(MAKE) $(PATCH)/*.ips
+	$(MAKE) all -f $(MAKE_NSO) MAKE_NSO=$(MAKE_NSO) BUILD=$(BUILD_DIR) TARGET=$(NAME)
 
-$(PATCH)/*.ips: $(PATCH_DIR)/*.slpatch $(CROSS_CONFIG) $(CROSS_MAPS)/*.map $(NAME_MAP) 
-	@rm -f $(PATCH)/*.ips
-	$(PYTHON) $(GEN_PATCH) $(CROSSVER)
+$(CODE_NAME).npdm: $(CODE_NAME).json
+	npdmtool $(CODE_NAME).json $(CODE_NAME).npdm
 
 send: all
-	$(PYTHON) $(SEND_PATCH) $(IP) $(CROSSVER)
+	$(PYTHON) $(SEND_PATCH) $(IP) $(TID) $(CODE_NAME) $(SUBSDK_NAME)
 
 clean:
 	$(MAKE) clean -f $(MAKE_NSO)
-	@rm -fr $(PATCH_PREFIX)*
+	@rm $(CODE_NAME).npdm

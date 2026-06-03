@@ -1,4 +1,5 @@
 #include "skyline/logger/DualLogger.hpp"
+#include "nn/nifm.h"
 
 #include <atomic>
 
@@ -21,7 +22,7 @@ void init_socket_thing(void*) {
     struct sockaddr_in serverAddr;
     s32 listenSocket = nn::socket::Socket(AF_INET, SOCK_STREAM, 0);
     if (listenSocket < 0) return;
-
+    
     int flags = 1;
     nn::socket::SetSockOpt(listenSocket, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof(flags));
 
@@ -62,15 +63,22 @@ void init_socket_thing(void*) {
     if (clientSocket < 0) return;
     g_tcpSocket = clientSocket;
 
-    char* message = "TCP Socket Connected.\n";
+    const char* message = "TCP Socket Connected.\n";
     nn::socket::Send(g_tcpSocket, (void*)message, strlen(message), 0);
 }
 
-void skyline_socket_init() {
+void skyline_socket_init() {    
+    nn::socket::Config config = {};
+
     const size_t poolSize = 0x600000;
     void* socketPool = memalign(0x4000, poolSize);
-    nn::socket::Initialize(socketPool, poolSize, 0x20000, 14);
 
+    config.pool = socketPool;
+    config.allocPoolSize = 0x20000;
+    config.poolSize = poolSize;
+    config.concurLimit = 14;
+
+    nn::socket::Initialize(config);
     g_loggerInit.store(true, std::memory_order_release);
 }
 
@@ -78,13 +86,10 @@ void start_listen_thread() {
     const size_t stackSize = 0x4000;
     void* threadStack = memalign(0x1000, stackSize);
 
+    skyline::logger::s_Instance->Log("[skyline_thread] Preparing to create thread");
     nn::os::ThreadType* thread = new nn::os::ThreadType;
     nn::os::CreateThread(thread, init_socket_thing, nullptr, threadStack, stackSize, 16, 0);
     nn::os::StartThread(thread);
-}
-
-Result init_normal(void* arg1, ulong arg2, ulong arg3, int arg4) {
-    return 0;
 }
 
 Result init_config(nn::socket::Config const& config) {
@@ -92,10 +97,6 @@ Result init_config(nn::socket::Config const& config) {
 }
 
 void setup_socket_hooks() {
-    Result (*socketInitWithPool)(void*, ulong, ulong, int) = nn::socket::Initialize;
-    A64HookFunction(reinterpret_cast<void*>(socketInitWithPool), reinterpret_cast<void*>(init_normal),
-                    NULL);
-
     Result (*socketInitWithConfig)(nn::socket::Config const&) = nn::socket::Initialize;
     A64HookFunction(reinterpret_cast<void*>(socketInitWithConfig), reinterpret_cast<void*>(init_config),
                     NULL);

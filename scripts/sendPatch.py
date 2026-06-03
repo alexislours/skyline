@@ -32,10 +32,9 @@ if '.' not in consoleIP:
 
 consolePort = 5000
 
-if len(sys.argv) < 4:
-    version = '600'
-else:
-    version = sys.argv[2]
+tid        = sys.argv[2] if len(sys.argv) > 2 else '010051F0207B2000'
+codeName   = sys.argv[3] if len(sys.argv) > 3 else 'living_the_dream'
+subsdkName = sys.argv[4] if len(sys.argv) > 4 else 'subsdk9'
 
 curDir = os.curdir
 
@@ -67,17 +66,17 @@ for patchDir in patchDirectories:
             ftp.storbinary(f'STOR {sdPath}', open(fullPath, 'rb'))
 
 ensuredirectory(ftp, '/atmosphere', 'contents')
-ensuredirectory(ftp, '/atmosphere/contents', "01006A800016E000")
-ensuredirectory(ftp, f'/atmosphere/contents/01006A800016E000', 'exefs')
+ensuredirectory(ftp, '/atmosphere/contents', tid)
+ensuredirectory(ftp, f'/atmosphere/contents/{tid}', 'exefs')
 
-binaryPath = f'{os.path.basename(os.getcwd())}{version}.nso'
+binaryPath = f'{os.path.basename(os.getcwd())}.nso'
 print(binaryPath)
 if os.path.isfile(binaryPath):
-    sdPath = f'/atmosphere/contents/01006A800016E000/exefs/subsdk9'
+    sdPath = f'/atmosphere/contents/{tid}/exefs/{subsdkName}'
     print(f'Sending {sdPath}')
     ftp.storbinary(f'STOR {sdPath}', open(binaryPath, 'rb'))
 
-metaPath = f'cross.npdm'
-sdPath = '/atmosphere/contents/01006A800016E000/exefs/main.npdm'
+metaPath = f'{codeName}.npdm'
+sdPath = f'/atmosphere/contents/{tid}/exefs/main.npdm'
 print(f'Sending {sdPath}')
-ftp.storbinary('STOR /atmosphere/contents/01006A800016E000/exefs/main.npdm', open(metaPath, 'rb'))
+ftp.storbinary(f'STOR {sdPath}', open(metaPath, 'rb'))

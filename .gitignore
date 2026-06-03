@@ -5,6 +5,7 @@
 *.id2
 *.idb
 *.nso
+*.npdm
 *.pfs0
 *.nacp
 *.nam

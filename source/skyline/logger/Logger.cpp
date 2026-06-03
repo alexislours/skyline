@@ -1,9 +1,11 @@
 #include "skyline/logger/Logger.hpp"
 
+#include <atomic>
 #include <cstdarg>
 
 #include "alloc.h"
 #include "mem.h"
+#include "nn/os.hpp"
 #include "operator.h"
 
 namespace skyline::logger {
@@ -13,6 +15,8 @@ Logger* s_Instance;
 #ifndef NOLOG
 
 std::queue<char*>* g_msgQueue = nullptr;
+static nn::os::MutexType g_msgQueueMutex;
+static std::atomic<bool> g_msgQueueReady{false};
 
 void ThreadMain(void* arg) {
     Logger* t = (Logger*)arg;
@@ -31,6 +35,10 @@ void ThreadMain(void* arg) {
 void Logger::StartThread() {
     const size_t stackSize = 0x3000;
     void* threadStack = memalign(0x1000, stackSize);
+
+    if (!g_msgQueue) g_msgQueue = new std::queue<char*>();
+    nn::os::InitializeMutex(&g_msgQueueMutex, false, 0);
+    g_msgQueueReady.store(true, std::memory_order_release);
 
     nn::os::ThreadType* thread = new nn::os::ThreadType;
     nn::os::CreateThread(thread, ThreadMain, this, threadStack, stackSize, 16, 0);
@@ -52,9 +60,15 @@ void Logger::SendRawFormat(const char* format, ...) {
 }
 
 void AddToQueue(char* data) {
-    if (!g_msgQueue) g_msgQueue = new std::queue<char*>();
+    if (!g_msgQueueReady.load(std::memory_order_acquire)) {
+        if (!g_msgQueue) g_msgQueue = new std::queue<char*>();
+        g_msgQueue->push(data);
+        return;
+    }
 
+    nn::os::LockMutex(&g_msgQueueMutex);
     g_msgQueue->push(data);
+    nn::os::UnlockMutex(&g_msgQueueMutex);
 }
 
 bool Logger::ShouldFlush() {
@@ -63,14 +77,19 @@ bool Logger::ShouldFlush() {
 
 void Logger::Flush() {
     if (!this->ShouldFlush()) return;
-    if (!g_msgQueue) return;
+    if (!g_msgQueueReady.load(std::memory_order_acquire) || !g_msgQueue) return;
 
-    while (!g_msgQueue->empty()) {
-        auto data = g_msgQueue->front();
+    std::queue<char*> pending;
+    nn::os::LockMutex(&g_msgQueueMutex);
+    std::swap(pending, *g_msgQueue);
+    nn::os::UnlockMutex(&g_msgQueueMutex);
+
+    while (!pending.empty()) {
+        auto data = pending.front();
 
         SendRaw(data, strlen(data));
         delete[] data;
-        g_msgQueue->pop();
+        pending.pop();
     }
 }
 

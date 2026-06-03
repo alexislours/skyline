@@ -3,18 +3,23 @@ name: Upload Release
 on:
   push:
     branches: [ master ]
- 
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:latest
     steps:
     - name: Clone repo
-      run: git clone --recurse-submodules $GITHUB_SERVER_URL/$GITHUB_REPOSITORY .
+      run: git clone --recurse-submodules --branch "$GITHUB_REF_NAME" $GITHUB_SERVER_URL/$GITHUB_REPOSITORY .
     - name: make
       run: make
     - name: Prepare ZIP
-      run: mkdir exefs && cp skyline600.nso exefs/subsdk9 && cp cross.npdm exefs/main.npdm && bsdtar -a -cf skyline.zip exefs
+      run: mkdir exefs && cp *.nso exefs/subsdk9 && cp living_the_dream.npdm exefs/main.npdm && bsdtar -a -cf skyline.zip exefs
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
@@ -27,7 +32,8 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: zip
-    - name: Upload Release
+    - name: Release (beta)
+      if: github.ref == 'refs/heads/master'
       uses: majkrzak/create-release@master
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -37,3 +43,8 @@ jobs:
         prerelease: true
         recreate: true
         assets: skyline.zip:skyline.zip:application/zip
+    - name: Release (tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: skyline.zip
