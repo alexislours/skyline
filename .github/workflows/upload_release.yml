@@ -2,7 +2,8 @@ name: Upload Release
 
 on:
   push:
-    branches: [ feature/tomodachi-telemetry ]
+    branches: [ master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
 
 permissions:
@@ -31,7 +32,8 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: zip
-    - name: Upload Release
+    - name: Release (beta)
+      if: github.ref == 'refs/heads/master'
       uses: majkrzak/create-release@master
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -41,3 +43,8 @@ jobs:
         prerelease: true
         recreate: true
         assets: skyline.zip:skyline.zip:application/zip
+    - name: Release (tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: skyline.zip
