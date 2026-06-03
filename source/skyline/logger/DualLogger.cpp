@@ -63,7 +63,7 @@ void init_socket_thing(void*) {
     if (clientSocket < 0) return;
     g_tcpSocket = clientSocket;
 
-    char* message = "TCP Socket Connected.\n";
+    const char* message = "TCP Socket Connected.\n";
     nn::socket::Send(g_tcpSocket, (void*)message, strlen(message), 0);
 }
 
@@ -90,10 +90,6 @@ void start_listen_thread() {
     nn::os::ThreadType* thread = new nn::os::ThreadType;
     nn::os::CreateThread(thread, init_socket_thing, nullptr, threadStack, stackSize, 16, 0);
     nn::os::StartThread(thread);
-}
-
-Result init_normal(void* arg1, ulong arg2, ulong arg3, int arg4) {
-    return 0;
 }
 
 Result init_config(nn::socket::Config const& config) {

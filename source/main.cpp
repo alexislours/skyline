@@ -13,23 +13,16 @@ char ALIGNA(0x1000) exception_handler_stack[0x4000];
 nn::os::UserExceptionInfo exception_info;
 
 void exception_handler(nn::os::UserExceptionInfo* info) {
-    skyline::logger::s_Instance->LogFormat("Exception occurred!\n");
+    skyline::logger::s_Instance->SendRawFormat("Exception occurred!\n");
 
-    skyline::logger::s_Instance->LogFormat("Error description: %x\n", info->ErrorDescription);
+    skyline::logger::s_Instance->SendRawFormat("Error description: %x\n", info->ErrorDescription);
     for (int i = 0; i < 29; i++)
-        skyline::logger::s_Instance->LogFormat("X[%02i]: %" PRIx64 "\n", i, info->CpuRegisters[i].x);
-    skyline::logger::s_Instance->LogFormat("FP: %" PRIx64 "\n", info->FP.x);
-    skyline::logger::s_Instance->LogFormat("LR: %" PRIx64 "\n", info->LR.x);
-    skyline::logger::s_Instance->LogFormat("SP: %" PRIx64 "\n", info->SP.x);
-    skyline::logger::s_Instance->LogFormat("PC: %" PRIx64 "\n", info->PC.x);
+        skyline::logger::s_Instance->SendRawFormat("X[%02i]: %" PRIx64 "\n", i, info->CpuRegisters[i].x);
+    skyline::logger::s_Instance->SendRawFormat("FP: %" PRIx64 "\n", info->FP.x);
+    skyline::logger::s_Instance->SendRawFormat("LR: %" PRIx64 "\n", info->LR.x);
+    skyline::logger::s_Instance->SendRawFormat("SP: %" PRIx64 "\n", info->SP.x);
+    skyline::logger::s_Instance->SendRawFormat("PC: %" PRIx64 "\n", info->PC.x);
 }
-
-static skyline::utils::Task* after_romfs_task = new skyline::utils::Task{[]() {
-    // load plugins
-    // Note: Bypassing the singleton-like system because some older games (Final Fantasy 9) seem to have issues with _cxa_guard_acquire which gcc automatically adds when using the static instance
-    auto manager = new skyline::plugin::Manager();
-    manager->LoadPluginsImpl();
-}};
 
 void stub() {}
 
@@ -42,27 +35,6 @@ Result handleNnFsMountRom(char const* path, void* buffer, unsigned long size) {
     skyline::utils::g_RomMountStr = std::string(path) + ":/";
 
     return rc;
-}
-
-void (*VAbortImpl)(char const*, char const*, char const*, int, Result const*, nn::os::UserExceptionInfo const*, char const*, va_list args);
-void handleNnDiagDetailVAbortImpl(char const* str1, char const* str2, char const* str3, int int1, Result const* code, nn::os::UserExceptionInfo const* ExceptionInfo, char const* fmt, va_list args) {
-    int len = vsnprintf(nullptr, 0, fmt, args);
-    char* fmt_info = new char[len + 1];
-    vsprintf(fmt_info, fmt, args);
-
-    const char* fmt_str = "%s\n%s\n%s\n%d\nError: 0x%x\n%s";
-    len = snprintf(nullptr, 0, fmt_str, str1, str2, str3, int1, *code, fmt_info);
-    char* report = new char[len + 1];
-    sprintf(report, fmt_str, str1, str2, str3, int1, *code, fmt_info);
-
-    skyline::logger::s_Instance->LogFormat("%s", report);
-    nn::err::ApplicationErrorArg* error =
-        new nn::err::ApplicationErrorArg(69, "The software is aborting.", report,
-                                         nn::settings::LanguageCode::Make(nn::settings::Language::Language_English));
-    nn::err::ShowApplicationError(*error);
-    delete[] report;
-    delete[] fmt_info;
-    VAbortImpl(str1, str2, str3, int1, code, ExceptionInfo, fmt, args);
 }
 
 static skyline::utils::Once g_RoInit;
@@ -129,17 +101,6 @@ void skyline_main() {
         reinterpret_cast<void*>(hooked_CreateLayer),
         (void**)&orig_CreateLayer
     );
-
-
-    // hook abort to get crash info
-    // Note: This was commented out because some games do not use or have certain variations of this symbol.
-    // This needs to be reworked to check for which symbol is available beforehand.
-    // Until then, check Atmosphere's crash reports or Ryujinx's output
-    /*
-        uintptr_t VAbort_ptr = 0;
-        nn::ro::LookupSymbol(&VAbort_ptr, "_ZN2nn4diag6detail10VAbortImplEPKcS3_S3_iPKNS_6ResultEPKNS_2os17UserExceptionInfoES3_RSt9__va_list");
-        A64HookFunction(reinterpret_cast<void*>(VAbort_ptr), reinterpret_cast<void*>(handleNnDiagDetailVAbortImpl), (void**)&VAbortImpl);
-    */
 
     skyline::logger::s_Instance->LogFormat("[skyline_main] text: 0x%" PRIx64 " | rodata: 0x%" PRIx64
                                            " | data: 0x%" PRIx64 " | bss: 0x%" PRIx64 " | heap: 0x%" PRIx64,
